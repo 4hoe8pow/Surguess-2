@@ -1,0 +1,58 @@
+# Unity generated files
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]serSettings/
+
+# Asset meta data
+*.pidb.meta
+*.pdb
+*.mdb
+*.sln
+*.suo
+*.user
+*.userprefs
+*.csproj
+*.unityproj
+*.booproj
+
+# Visual Studio cache
+.vscode/
+.idea/
+
+# Visual Studio specific files
+*.sln
+*.csproj
+*.suo
+*.user
+*.userprefs
+*.pidb
+*.pidb.meta
+*.sln.ide
+*.sln.userprefs
+
+# Rider specific files
+.idea/
+*.sln.iml
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Android Studio specific files
+*.apk
+*.ap_
+*.dex
+*.class
+
+# Backup files
+*.bak
+*.swp
+*.tmp
+
+Library/
+ProjectSettings/
+IOS_BUILD/
