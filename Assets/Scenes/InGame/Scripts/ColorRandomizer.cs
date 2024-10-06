@@ -8,6 +8,10 @@ public class ColorRandomizer : MonoBehaviour
 
     public int textureWidth = 256; // テクスチャの幅
     public int textureHeight = 256; // テクスチャの高さ
+    public float noiseScale = 0.1f; // ノイズのスケール
+    public float sinFrequency = 3.0f; // 三角関数の周波数
+    public int stampCount = 5; // スタンプの数
+    public int stampRadius = 30; // スタンプの半径
 
     void Start()
     {
@@ -16,30 +20,29 @@ public class ColorRandomizer : MonoBehaviour
 
     public void RandomizeColors()
     {
-        // 色相のランダムな開始値を決定
-        float hueStart = Random.Range(0f, 1f); // 0〜1の間でランダムな色相を選出
+        // ランダムに色を生成
+        float hueStart = Random.Range(0f, 1f);
 
-        // 4つの色を均等に配置
         for (int i = 0; i < colors.Length; i++)
         {
-            float hue = (hueStart + (i * 0.25f)) % 1f; // 25%ずつずらす
-            colors[i] = Color.HSVToRGB(hue, 1f, 1f); // 彩度と明度を最大に設定
+            float hue = (hueStart + (i * 0.25f)) % 1f;
+            colors[i] = Color.HSVToRGB(hue, 1f, 1f); // 彩度と明度を最大に
             Debug.Log($"Color {i} assigned: {colors[i]}");
         }
 
-        // 色の比率をランダムに決定 (16%-30%)
+        // 色の比率を決定 (16%〜30%) 
         float total = 0;
         for (int i = 0; i < colorRatios.Length; i++)
         {
             if (i < 3)
             {
-                colorRatios[i] = Random.Range(0.16f, 0.30f); // ランダムな割合を割り当て
+                colorRatios[i] = Random.Range(0.16f, 0.30f);
                 total += colorRatios[i];
                 Debug.Log($"Color {i} ratio assigned: {colorRatios[i] * 100}%");
             }
             else
             {
-                colorRatios[i] = 1f - total; // 最後の色は残りの割合
+                colorRatios[i] = 1f - total; // 残りの割合
                 Debug.Log($"Color {i} ratio assigned: {colorRatios[i] * 100}% (remaining percentage)");
             }
         }
@@ -61,60 +64,157 @@ public class ColorRandomizer : MonoBehaviour
             return;
         }
 
-        if (!targetObject.TryGetComponent<MeshFilter>(out var meshFilter))
-        {
-            Debug.LogError("ターゲットオブジェクトにMeshFilterがありません！");
-            return;
-        }
-
-        Mesh mesh = meshFilter.mesh;
-        Vector2[] uvs = mesh.uv; // UVマッピングを取得
-        Vector3[] normals = mesh.normals; // 頂点の法線ベクトルを取得
-
         // 新しいテクスチャを作成
         Texture2D texture = new Texture2D(textureWidth, textureHeight);
-        int colorStartX = 0;
 
-        // 各色の領域をテクスチャに描画
-        for (int i = 0; i < colors.Length; i++)
+        // テクスチャにランダムに色を塗る処理
+        Color[] pixelColors = new Color[textureWidth * textureHeight];
+
+        // ランダムなノイズと三角関数でベースの塗りを作成
+        for (int x = 0; x < textureWidth; x++)
         {
-            int colorWidth = Mathf.FloorToInt(colorRatios[i] * textureWidth); // 各色の領域幅を計算
-            for (int x = colorStartX; x < colorStartX + colorWidth; x++)
+            for (int y = 0; y < textureHeight; y++)
             {
-                for (int y = 0; y < textureHeight; y++)
-                {
-                    // 面が表かどうか判定
-                    if (IsFrontFace(normals, x, y, textureWidth, textureHeight))
-                    {
-                        texture.SetPixel(x, y, colors[i]); // 表面のみに色を設定
-                    }
-                    else
-                    {
-                        texture.SetPixel(x, y, Color.clear); // 裏面は透明にする
-                    }
-                }
+                float noiseValue = Mathf.PerlinNoise(x * noiseScale, y * noiseScale);
+                float sinValue = Mathf.Sin((x + y) * sinFrequency);
+                float mixedValue = (noiseValue + sinValue) * 0.5f;
+
+                Color selectedColor = GetColorBasedOnMix(mixedValue);
+                pixelColors[y * textureWidth + x] = selectedColor;
             }
-            colorStartX += colorWidth;
-            Debug.Log($"Applied color {i} to texture from {colorStartX - colorWidth} to {colorStartX}");
         }
 
-        // テクスチャを適用
+        // スタンプをランダムな位置に適用
+        for (int i = 0; i < stampCount; i++)
+        {
+            int stampX = Random.Range(stampRadius, textureWidth - stampRadius);
+            int stampY = Random.Range(stampRadius, textureHeight - stampRadius);
+            Color stampColor = colors[Random.Range(0, colors.Length)];
+            ApplyStamp(pixelColors, stampX, stampY, stampRadius, stampColor);
+        }
+
+        // 色の比率を調整
+        AdjustColorRatios(pixelColors);
+
+        texture.SetPixels(pixelColors);
         texture.Apply();
         meshRenderer.material.mainTexture = texture;
         Debug.Log("テクスチャがメッシュに適用されました。");
     }
 
-    // 法線ベクトルを使って表面かどうかを判定
-    bool IsFrontFace(Vector3[] normals, int x, int y, int textureWidth, int textureHeight)
+    // スタンプの適用
+    void ApplyStamp(Color[] pixelColors, int centerX, int centerY, int radius, Color stampColor)
     {
-        int vertexIndex = (y * textureWidth) + x; // 現在の頂点のインデックスを計算
-        if (vertexIndex >= normals.Length)
-            return true; // 安全対策：頂点が存在しない場合は表面とみなす
+        for (int x = -radius; x <= radius; x++)
+        {
+            for (int y = -radius; y <= radius; y++)
+            {
+                if (x * x + y * y <= radius * radius) // 円形スタンプ
+                {
+                    int pixelX = centerX + x;
+                    int pixelY = centerY + y;
 
-        Vector3 normal = normals[vertexIndex]; // 法線ベクトルを取得
+                    if (pixelX >= 0 && pixelX < textureWidth && pixelY >= 0 && pixelY < textureHeight)
+                    {
+                        pixelColors[pixelY * textureWidth + pixelX] = stampColor;
+                    }
+                }
+            }
+        }
+    }
 
-        // 法線ベクトルが正面を向いているかどうか
-        return Vector3.Dot(normal, Vector3.forward) > 0;
+    // 混合値に基づいて色を選択
+    Color GetColorBasedOnMix(float mixValue)
+    {
+        float cumulativeRatio = 0f;
+        for (int i = 0; i < colorRatios.Length; i++)
+        {
+            cumulativeRatio += colorRatios[i];
+            if (mixValue <= cumulativeRatio)
+            {
+                return colors[i];
+            }
+        }
+        return colors[colors.Length - 1]; // 最後の色を返す (安全対策)
+    }
+
+    // 色の比率を計算し調整
+    void AdjustColorRatios(Color[] pixelColors)
+    {
+        int[] colorCounts = new int[colors.Length];
+        int totalPixels = pixelColors.Length;
+
+        // 現在の色のピクセル数をカウント
+        for (int i = 0; i < pixelColors.Length; i++)
+        {
+            for (int j = 0; j < colors.Length; j++)
+            {
+                if (pixelColors[i] == colors[j])
+                {
+                    colorCounts[j]++;
+                    break;
+                }
+            }
+        }
+
+        // 目標の色比率に基づいて調整
+        for (int i = 0; i < colors.Length; i++)
+        {
+            int targetCount = Mathf.FloorToInt(colorRatios[i] * totalPixels);
+
+            if (colorCounts[i] < targetCount)
+            {
+                // 不足分のピクセルを増やす
+                int pixelsToAdd = targetCount - colorCounts[i];
+                AddColorPixels(pixelColors, colors[i], pixelsToAdd);
+            }
+            else if (colorCounts[i] > targetCount)
+            {
+                // 過剰なピクセルを減らす
+                int pixelsToRemove = colorCounts[i] - targetCount;
+                RemoveColorPixels(pixelColors, colors[i], pixelsToRemove);
+            }
+        }
+    }
+
+    // 指定された色のピクセルを増やす
+    void AddColorPixels(Color[] pixelColors, Color color, int count)
+    {
+        int added = 0;
+        for (int i = 0; i < pixelColors.Length && added < count; i++)
+        {
+            if (pixelColors[i] != color)
+            {
+                pixelColors[i] = color;
+                added++;
+            }
+        }
+    }
+
+    // 指定された色のピクセルを減らす
+    void RemoveColorPixels(Color[] pixelColors, Color color, int count)
+    {
+        int removed = 0;
+        for (int i = 0; i < pixelColors.Length && removed < count; i++)
+        {
+            if (pixelColors[i] == color)
+            {
+                pixelColors[i] = GetAlternateColor(color);
+                removed++;
+            }
+        }
+    }
+
+    // 別の色をランダムに取得
+    Color GetAlternateColor(Color excludeColor)
+    {
+        Color newColor;
+        do
+        {
+            newColor = colors[Random.Range(0, colors.Length)];
+        } while (newColor == excludeColor);
+
+        return newColor;
     }
 
     // カラーを取得するメソッド
@@ -123,10 +223,9 @@ public class ColorRandomizer : MonoBehaviour
         return colors;
     }
 
-    // 最も面積の多い色を取得するメソッド（仮実装）
+    // 最も面積の多い色を取得するメソッド
     public Color GetMostPrevalentColor()
     {
-        // colorRatiosが最大の色のインデックスを見つける
         int maxIndex = 0;
         float maxRatio = colorRatios[0];
 
@@ -141,5 +240,4 @@ public class ColorRandomizer : MonoBehaviour
 
         return colors[maxIndex]; // 最大の比率を持つ色を返す
     }
-
 }

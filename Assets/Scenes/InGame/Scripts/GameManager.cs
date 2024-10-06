@@ -85,6 +85,10 @@ public class GameManager : MonoBehaviour
     {
         StopAllCoroutines();
         DisableButtons(); // ボタンを非活性化
+        if (colorRandomizer.targetObject != null)
+        {
+            colorRandomizer.targetObject.SetActive(false);
+        }
         ShowScoreWindow(); // スコアウィンドウを表示
 
         UpdateBestScore(); // ベストスコアの更新
